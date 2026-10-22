@@ -1,4 +1,5 @@
 import os
+import time
 import random
 import string
 import logging
@@ -9,7 +10,7 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-BOT_TOKEN = "8260218568:AAFcGh1OSuZoqF0riYkwyZ9zWCj0AcTfpYg"
+BOT_TOKEN = "8260218568:AAEzSRc_MWPJUByk7rdamSnkgsyuunE4cSU"
 ADMIN_ID = 8268734462
 CARD_NUMBER = "6219861858158784"
 CARD_HOLDER = "علیرضا نوروزی"
@@ -99,7 +100,7 @@ def send_payment_prompt(chat_id, state):
     cancel_markup.add(InlineKeyboardButton("🔙 انصراف و بازگشت به منو", callback_data="back_main"))
     details_summary = ""
     if state.get("site_credentials"):
-        details_summary += f"📧 <b>اطلاعات هاست/سایت ثبت‌شده:</b>\n<code>{state['site_credentials']}</code>\n"
+        details_summary += f"📧 <b>اطلاعات جیمیل ثبت‌شده:</b>\n<code>{state['site_credentials']}</code>\n"
     if state.get("channel_id"):
         details_summary += f"📢 <b>آیدی کانال ثبت‌شده:</b> <code>{state['channel_id']}</code>\n"
     if state.get("project_idea"):
@@ -108,12 +109,12 @@ def send_payment_prompt(chat_id, state):
     payment_text = (
         f"✅ <b>اطلاعات و ایده شما با موفقیت ثبت شد!</b>\n\n"
         f"🛍 <b>سفارش:</b> {state['product_name']}\n"
-        f"💰 <b>مبلغ نهایی قابل پرداخت:</b> <b>{state['price']}</b>\n"
+        f"💰 <b>مبلغ نهایی قابل پرداخت:</b> <b>{state['price']}</b>\n\n"
         f"{details_summary}\n"
         f"💳 لطفا مبلغ <b>{state['price']}</b> رو به شماره کارت زیر واریز کن:\n"
         f"<code>{CARD_NUMBER}</code>\n"
         f"👤 به نام: <b>{CARD_HOLDER}</b>\n\n"
-        f"📸 <b>مرحله آخر:</b> بعد از واریز، <b>عکس فیش پرداخت</b> رو همینجا بفرست.\n\n"
+        f"📸 <b>مرحله آخر:</b> بعد از واریز، <b>عکس فیش پرداخت</b> رو همینجا بفرست تا کد رهگیری برات صادر بشه.\n\n"
         f"🛟 پشتیبانی مستقیم: {SUPPORT_ID}"
     )
     bot.send_message(chat_id, payment_text, reply_markup=cancel_markup)
@@ -126,6 +127,7 @@ def start_command(message):
     welcome_text = (
         f"سلام <b>{message.from_user.first_name}</b> عزیز! 👋\n\n"
         "به ربات رسمی فروش خدمات ما خوش اومدی.\n"
+        "لطفا از منوی شیشه‌ای زیر بخش مورد نظرت رو انتخاب کن 👇\n\n"
         f"🎧 آیدی پشتیبانی: {SUPPORT_ID}"
     )
     bot.send_message(message.chat.id, welcome_text, reply_markup=get_main_menu(user_id))
@@ -217,10 +219,10 @@ def handle_callbacks(call):
         cancel_markup.add(InlineKeyboardButton("🔙 انصراف", callback_data="back_main"))
         if p_key == "fake_member":
             user_states[user_id] = {"step": "waiting_for_channel_id", "product_key": p_key, "product_name": p["name"], "price": format_toman(p["price"])}
-            bot.edit_message_text(f"🛍 <b>{p['name']}</b>\n\n📢 <b>آیدی کانال یا لینک رو بفرست:</b>", call.message.chat.id, call.message.message_id, reply_markup=cancel_markup)
+            bot.edit_message_text(f"🛍 <b>{p['name']}</b>\n\n📢 <b>آیدی کانال یا لینک کانالت رو بفرست (با @ یا t.me):</b>", call.message.chat.id, call.message.message_id, reply_markup=cancel_markup)
         else:
             user_states[user_id] = {"step": "waiting_for_project_idea", "product_key": p_key, "product_name": p["name"], "price": format_toman(p["price"])}
-            bot.edit_message_text(f"🛍 <b>{p['name']}</b>\n\n💡 <b>ایده‌ای که می‌خوای رو کامل توضیح بده:</b>", call.message.chat.id, call.message.message_id, reply_markup=cancel_markup)
+            bot.edit_message_text(f"🛍 <b>{p['name']}</b>\n\n💡 <b>ایده‌ای که می‌خوای باشه رو کامل بگو:</b>", call.message.chat.id, call.message.message_id, reply_markup=cancel_markup)
     elif data.startswith("approve_") or data.startswith("reject_"):
         if user_id != ADMIN_ID:
             return
@@ -240,7 +242,7 @@ def handle_callbacks(call):
             order["status"] = "rejected"
             bot.answer_callback_query(call.id, "❌ رد شد.")
             try:
-                bot.send_message(order["user_id"], f"⚠️ <b>سفارش شما رد شد.</b>")
+                bot.send_message(order["user_id"], f"⚠️ <b>سفارش شما رد شد.</b>\nجهت پیگیری با {SUPPORT_ID} در ارتباط باشید.")
             except:
                 pass
             bot.edit_message_caption(call.message.caption + "\n\n❌ <b>رد شد</b>", call.message.chat.id, call.message.message_id)
@@ -250,7 +252,7 @@ def handle_receipt_photo(message):
     user_id = message.from_user.id
     state = user_states.get(user_id)
     if not state or state.get("step") != "waiting_for_receipt":
-        bot.reply_to(message, "⚠️ اول از /start محصول انتخاب کن.")
+        bot.reply_to(message, "⚠️ اول از /start محصول مورد نظرت رو انتخاب کن.")
         return
     t_code = generate_tracking_code(8)
     photo_id = message.photo[-1].file_id
@@ -263,11 +265,36 @@ def handle_receipt_photo(message):
         "project_idea": state.get("project_idea"), "status": "pending"
     }
     user_states.pop(user_id, None)
-    bot.reply_to(message, f"✅ فیش دریافت شد!\n🔖 کد رهگیری شما: <code>{t_code}</code>")
+    bot.reply_to(
+        message,
+        f"✅ <b>فیش پرداخت شما دریافت شد!</b>\n"
+        f"🔖 کد رهگیری شما: <code>{t_code}</code>\n"
+        f"🛍 سفارش: {state['product_name']}\n\n"
+        f"⏳ منتظر تایید مدیریت باشید."
+    )
     
     admin_markup = InlineKeyboardMarkup(row_width=2)
-    admin_markup.add(InlineKeyboardButton("✅ تایید", callback_data=f"approve_{t_code}"), InlineKeyboardButton("❌ رد", callback_data=f"reject_{t_code}"))
-    admin_cap = f"🔔 <b>سفارش جدید!</b>\n🔖 <code>{t_code}</code>\n🛍 {state['product_name']}\n💰 {state['price']}\n👤 {full_name} ({username})"
+    admin_markup.add(
+        InlineKeyboardButton("✅ تایید", callback_data=f"approve_{t_code}"),
+        InlineKeyboardButton("❌ رد", callback_data=f"reject_{t_code}")
+    )
+    extra_info = ""
+    if state.get("site_credentials"):
+        extra_info += f"\n📧 جیمیل و مشخصات: <code>{state['site_credentials']}</code>"
+    if state.get("channel_id"):
+        extra_info += f"\n📢 آیدی کانال: <code>{state['channel_id']}</code>"
+    if state.get("project_idea"):
+        extra_info += f"\n💡 ایده کاربر: <code>{state['project_idea']}</code>"
+
+    admin_cap = (
+        f"🔔 <b>سفارش جدید ثبت شد!</b>\n"
+        f"🔖 کد رهگیری: <code>{t_code}</code>\n"
+        f"🛍 محصول: {state['product_name']}\n"
+        f"💰 مبلغ: {state['price']}\n"
+        f"👤 مشتری: {full_name} ({username})\n"
+        f"🆔 آیدی عددی: <code>{user_id}</code>"
+        f"{extra_info}"
+    )
     try:
         bot.send_photo(ADMIN_ID, photo_id, caption=admin_cap, reply_markup=admin_markup)
     except:
@@ -283,28 +310,28 @@ def handle_text(message):
         tickets_db.append(f"🆘 پیام از {message.from_user.first_name} (`{user_id}`):\n{text}")
         user_states.pop(user_id, None)
         try:
-            bot.send_message(ADMIN_ID, f"🆘 <b>تیکت جدید:</b>\n{text}")
+            bot.send_message(ADMIN_ID, f"🆘 <b>پیام پشتیبانی جدید از {message.from_user.first_name} (<code>{user_id}</code>):</b>\n\n{text}")
         except:
             pass
-        bot.reply_to(message, f"✅ پیام برای مدیریت ارسال شد.\n🆔 {SUPPORT_ID}")
+        bot.reply_to(message, f"✅ پیام شما برای مدیریت ارسال شد.\n🆔 {SUPPORT_ID}")
         return
 
     if state and state.get("step") == "waiting_for_site_credentials":
         if "@gmail.com" not in text.lower():
-            bot.reply_to(message, "⚠️ جیمیل معتبر نیست!")
+            bot.reply_to(message, "⚠️ لطفا یک جیمیل معتبر (دارای @gmail.com) به همراه نام و رمز بفرست!")
             return
         state["site_credentials"] = text
         state["step"] = "waiting_for_project_idea"
-        bot.reply_to(message, "✅ اطلاعات ثبت شد!\n\n💡 <b>ایده‌ای که می‌خوای سایتت داشته باشه رو کامل توضیح بده:</b>")
+        bot.reply_to(message, "✅ اطلاعات ثبت شد!\n\n💡 <b>حالا ایده‌ای که می‌خوای سایتت داشته باشه رو کامل بگو:</b>")
         return
 
     if state and state.get("step") == "waiting_for_channel_id":
         if not is_valid_channel_id(text):
-            bot.reply_to(message, "⚠️ آیدی کانال معتبر نیست (با @ یا لینک بفرست).")
+            bot.reply_to(message, "⚠️ آیدی کانال معتبر نیست! لطفا با @ یا لینک t.me بفرست.")
             return
         state["channel_id"] = text
         state["step"] = "waiting_for_project_idea"
-        bot.reply_to(message, "✅ آیدی ثبت شد!\n\n💡 <b>ایده‌ای که می‌خوای رو کامل توضیح بده:</b>")
+        bot.reply_to(message, "✅ آیدی کانال ثبت شد!\n\n💡 <b>حالا توضیحات یا ایده‌ای که می‌خوای رو بگو:</b>")
         return
 
     if state and state.get("step") == "waiting_for_project_idea":
@@ -313,8 +340,15 @@ def handle_text(message):
         send_payment_prompt(message.chat.id, state)
         return
 
-    bot.send_message(message.chat.id, f"لطفا از منو استفاده کن 👇\n🎧 پشتیبانی: {SUPPORT_ID}", reply_markup=get_main_menu(user_id))
+    bot.send_message(message.chat.id, f"لطفا از منوی زیر انتخاب کن 👇\n🎧 پشتیبانی: {SUPPORT_ID}", reply_markup=get_main_menu(user_id))
 
 if __name__ == "__main__":
     threading.Thread(target=start_keep_alive_server, daemon=True).start()
-    bot.infinity_polling(skip_pending=True)
+    while True:
+        try:
+            bot.remove_webhook()
+            time.sleep(1)
+            bot.polling(none_stop=True, skip_pending=True, timeout=60)
+        except Exception as e:
+            logging.error(f"Polling error: {e}")
+            time.sleep(5)
