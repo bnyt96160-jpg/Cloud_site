@@ -1,11 +1,9 @@
 import os
 import random
 import string
-import re
 import logging
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
-import requests
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
@@ -203,7 +201,7 @@ def handle_callbacks(call):
         cancel_markup.add(InlineKeyboardButton("🔙 بازگشت", callback_data="back_main"))
         cred_msg = (
             f"🌐 <b>بخش طراحی سایت</b>\n\n"
-            f"📧 پیشنهاد ما برای ثبت نام و جیمیل خام:\n"
+            f"📧 اطلاعات پیشنهادی برای ثبت‌نام (جیمیل خام و رمز):\n"
             f"👤 نام پیشنهادی: <code>{s_name}</code>\n"
             f"📩 جیمیل خام: <code>{s_email}</code>\n"
             f"🔑 رمز: <code>{s_pass}</code>\n\n"
@@ -302,11 +300,11 @@ def handle_text(message):
 
     if state and state.get("step") == "waiting_for_channel_id":
         if not is_valid_channel_id(text):
-            bot.reply_to(message, "⚠️ آیدی کانال معتبر نیست (با @ بفرست).")
+            bot.reply_to(message, "⚠️ آیدی کانال معتبر نیست (با @ یا لینک بفرست).")
             return
         state["channel_id"] = text
         state["step"] = "waiting_for_project_idea"
-        bot.reply_to(message, "✅ آیدی ثبت شد!\n\n💡 <b>توضیحات ممبر فیک رو بگو:</b>")
+        bot.reply_to(message, "✅ آیدی ثبت شد!\n\n💡 <b>ایده‌ای که می‌خوای رو کامل توضیح بده:</b>")
         return
 
     if state and state.get("step") == "waiting_for_project_idea":
